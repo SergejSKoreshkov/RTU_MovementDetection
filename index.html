@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <style>
+        body {
+            background-color: black;
+            width: 100vw;
+            height: 100vh;
+        }
+        div {
+            width: 5px;
+            height: 5px;
+            border-radius: 100%;
+            background-color: white;
+            margin-top: 20%;
+            animation: line ease-in-out 3s infinite;
+        }
+        @keyframes line {
+            0% {
+                transform: translateY(0%) translateX(0%);
+            }
+            50% {
+                transform: translateY(200px) translateX(40px);
+            }
+            100% {
+                transform: translateY(0%) translateX(0%);
+            }
+        }
+    </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <div></div>
+</body>
+</html>
