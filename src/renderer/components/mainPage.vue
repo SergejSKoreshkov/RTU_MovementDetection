@@ -10,6 +10,7 @@
         <button class="btn btn-secondary" @click="setVideo6">Set video 2</button>
         <button class="btn btn-secondary" @click="setVideo8">Set video 3</button>
         <button class="btn btn-secondary" @click="setVideo10">Set video 4</button>
+        <button class="btn btn-secondary" @click="setVideo11">Set video 5</button>
         <hr>
         <button class="btn btn-primary" @click="play">Play</button>
         <button class="btn btn-danger" @click="pause">Pause</button>
@@ -151,6 +152,12 @@ export default {
       this.blocksX = 64
       this.blocksY = 24
       this.$refs.video1.src = 'public/main10.mp4'
+    },
+    setVideo11 () {
+      this.speed = 50
+      this.blocksX = 64
+      this.blocksY = 24
+      this.$refs.video1.src = 'public/main11.mp4'
     },
     play () {
       this.$refs.video1.play()
