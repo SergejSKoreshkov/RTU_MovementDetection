@@ -14,6 +14,12 @@
         <button class="btn btn-primary" @click="play">Play</button>
         <button class="btn btn-danger" @click="pause">Pause</button>
         <hr>
+        <button class="btn btn-warning" @click="$refs.video1.playbackRate = 0.2">0.2x</button>
+        <button class="btn btn-warning" @click="$refs.video1.playbackRate = 0.5">0.5x</button>
+        <button class="btn btn-warning" @click="$refs.video1.playbackRate = 1">1x</button>
+        <button class="btn btn-warning" @click="$refs.video1.playbackRate = 1.5">1.5x</button>
+        <button class="btn btn-warning" @click="$refs.video1.playbackRate = 2">2x</button>
+        <hr>
         <div class="form-group">
           <label for="range">Signed difference threshold: {{diffT}}</label>
           <input type="range" min="1" max="255" class="form-control-range" id="range" v-model="diffT">
@@ -24,7 +30,7 @@
         </div>
         <div class="form-group">
           <label for="range">Block combine threshold: {{blockT}}</label>
-          <input type="range" min="1" max="100" class="form-control-range" id="range" v-model="blockT">
+          <input type="range" min="1" :max="maxBlockT" class="form-control-range" id="range" v-model="blockT">
         </div>
       </div>
     </div>
@@ -46,6 +52,10 @@
 </template>
 
 <script>
+
+const Sx = (m1, m2) => m1[0] * m2[0] + m1[1] * m2[1]
+const Sy = (m1, m2) => m1[2] * m2[2] + m1[3] * m2[3]
+
 let ctx1 = null
 let ctx2 = null
 let ctx3 = null
@@ -64,7 +74,8 @@ export default {
       blocksY: 10,
       diffT: 30,
       magnT: 100,
-      blockT: 100
+      blockT: 100,
+      maxBlockT: 10
     }
   },
   mounted () {
@@ -78,11 +89,11 @@ export default {
     ctx3 = canvas3.getContext('2d')
     ctx4 = canvas4.getContext('2d')
     ctx5 = canvas5.getContext('2d')
+    this.$refs.video1.volume = 0
   },
   methods: {
     setVideo1 () {
       this.speed = 800
-      this.$refs.video1.playbackSpeed = 0.5
       this.blocksX = 30
       this.blocksY = 15
       this.$refs.video1.src = 'public/main.mp4'
@@ -197,13 +208,13 @@ export default {
         const intensityNow = parseInt(0.299 * frameNow.data[i] + 0.587 * frameNow.data[i + 1] + 0.114 * frameNow.data[i + 2])
         const intensityPrev = parseInt(0.299 * prevFrame.data[i] + 0.587 * prevFrame.data[i + 1] + 0.114 * prevFrame.data[i + 2])
         const diff = intensityNow - intensityPrev
-        if (diff > 30) {
+        if (diff > this.diffT) {
           diffFrame.data[i] = 0
           diffFrame.data[i + 1] = 0
           diffFrame.data[i + 2] = 255
           diffFrame.data[i + 3] = 255
           EMDgraph.x[y][x] = diff
-        } else if (diff < -30) {
+        } else if (diff < -this.diffT) {
           diffFrame.data[i] = 255
           diffFrame.data[i + 1] = 0
           diffFrame.data[i + 2] = 0
@@ -225,10 +236,12 @@ export default {
       ctx3.fillRect(0, 0, width, height)
       ctx4.putImageData(frameNow, 0, 0)
 
+      const cArray = new Array(this.blocksY).fill(0).map(el => new Array(this.blocksX).fill(0))
+
       for (let y = 0; y < video.videoHeight; y += gridY) {
         for (let x = 0; x < video.videoWidth; x += gridX) {
-          // const blockX = x / gridX
-          // const blockY = y / gridY
+          const blockX = x / gridX
+          const blockY = y / gridY
           // CBlocks[y][x]
           let c = [0, 0, 0, 0] // Cx+ Cx- Cy+ Cy-
           for (let i = 0; i < gridY; i++) {
@@ -327,19 +340,62 @@ export default {
             ctx3.stroke()
           }
           const m = (Math.max(c[0], c[1]) + Math.max(c[2] + c[3])) / 2
-          if (m > 10) {
-            ctx4.beginPath()
-            ctx4.moveTo(x, y)
-            ctx4.lineTo(x + gridX, y)
-            ctx4.lineTo(x + gridX, y + gridY)
-            ctx4.lineTo(x, y + gridY)
-            ctx4.lineTo(x, y)
-            ctx4.strokeStyle = '#ff0'
-            ctx4.lineWidth = 3
-            ctx4.stroke()
-          }
+          cArray[Math.round(blockY)][Math.round(blockX)] = [...c, m]
         }
       }
+      let resultObjects = []
+
+      for (let y = 0; y < cArray.length; y++) {
+        for (let x = 0; x < cArray[y].length; x++) {
+          if (x === 0 || y === 0) continue
+          if (cArray[y][x] === 0 || cArray[y][x][4] < this.magnT) continue
+
+          let index = resultObjects.findIndex(el => el.includes(`${x},${y - 1}`))
+          if (index !== -1) {
+            const sx = Sx(cArray[y][x], cArray[y - 1][x])
+            this.maxBlockT = Math.max(this.maxBlockT, sx)
+            if (sx > this.blockT) {
+              resultObjects[index].push(`${x},${y}`)
+              continue
+            }
+          }
+
+          index = resultObjects.findIndex(el => el.includes(`${x - 1},${y}`))
+          if (index !== -1) {
+            const sy = Sy(cArray[y][x - 1], cArray[y][x])
+            this.maxBlockT = Math.max(this.maxBlockT, sy)
+            if (sy > this.blockT) {
+              resultObjects[index].push(`${x},${y}`)
+              continue
+            }
+          }
+
+          resultObjects.push([`${x},${y}`])
+        }
+      }
+
+      resultObjects = resultObjects.map(el =>
+        el.map(xy => xy.split(',').map(num => parseInt(num)))
+      )
+      // console.log(resultObjects)
+      resultObjects.forEach(arr => {
+        const X = arr.map(el => el[0])
+        const Y = arr.map(el => el[1])
+        const minX = Math.min(...X) * gridX
+        const maxX = Math.max(...X) * gridX
+        const minY = Math.min(...Y) * gridY
+        const maxY = Math.max(...Y) * gridY
+
+        ctx4.beginPath()
+        ctx4.moveTo(minX, minY)
+        ctx4.lineTo(maxX + gridX, minY)
+        ctx4.lineTo(maxX + gridX, maxY + gridY)
+        ctx4.lineTo(minX, maxY + gridY)
+        ctx4.lineTo(minX, minY)
+        ctx4.strokeStyle = '#ff0'
+        ctx4.lineWidth = 3
+        ctx4.stroke()
+      })
 
       prevFrame = frameNow
     }
